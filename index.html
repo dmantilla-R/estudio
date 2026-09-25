@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#58cc02">
+<title>Estudio Diario</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root {
+    --verde: #58cc02; --verde-osc: #46a302; --verde-claro: #d7ffb8;
+    --rojo: #ff4b4b; --rojo-osc: #ea2b2b; --rojo-claro: #ffdfe0;
+    --azul: #1cb0f6; --azul-osc: #1899d6; --naranja: #ff9600; --dorado: #ffc800;
+    --fondo: #ffffff; --superficie: #ffffff; --borde: #e5e5e5; --borde-osc: #cecece;
+    --texto: #3c3c3c; --texto-suave: #777777; --sel: #ddf4ff; --sel-borde: #84d8ff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --fondo: #131f24; --superficie: #1b2b32; --borde: #37464f; --borde-osc: #2a3940;
+      --texto: #f1f7fb; --texto-suave: #a0b0b8; --sel: #1f3d4d; --sel-borde: #3f85a7;
+      --verde-claro: #20331a; --rojo-claro: #3a2023;
+    }
+  }
+  :root[data-theme="dark"] {
+    --fondo: #131f24; --superficie: #1b2b32; --borde: #37464f; --borde-osc: #2a3940;
+    --texto: #f1f7fb; --texto-suave: #a0b0b8; --sel: #1f3d4d; --sel-borde: #3f85a7;
+    --verde-claro: #20331a; --rojo-claro: #3a2023;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--fondo); color: var(--texto);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 16px; line-height: 1.4;
+  }
+  .app { max-width: 560px; margin: 0 auto; min-height: 100%; display: flex; flex-direction: column; }
+  main { flex: 1; padding: 16px 16px 96px; }
+  h1, h2, h3 { margin: 0 0 8px; }
+  p { margin: 0 0 12px; }
+  .suave { color: var(--texto-suave); }
+  .oculto { display: none !important; }
+
+  /* Barra superior */
+  .top { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px;
+         border-bottom: 2px solid var(--borde); position: sticky; top: 0; background: var(--fondo); z-index: 5; }
+  .stat { font-weight: 800; display: flex; gap: 4px; align-items: center; }
+  .stat.racha { color: var(--naranja); } .stat.xp { color: var(--dorado); } .stat.vidas { color: var(--rojo); }
+  .stat.apagada { color: var(--texto-suave); filter: grayscale(1); }
+
+  /* Navegación inferior */
+  nav.tabs { position: fixed; bottom: 0; left: 0; right: 0; display: flex; justify-content: center;
+             background: var(--fondo); border-top: 2px solid var(--borde); padding-bottom: env(safe-area-inset-bottom); z-index: 5; }
+  nav.tabs .inner { display: flex; width: 100%; max-width: 560px; }
+  nav.tabs button { flex: 1; background: none; border: none; padding: 10px 4px; font: inherit; font-weight: 700;
+                    color: var(--texto-suave); display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 13px; }
+  nav.tabs button .ico { font-size: 22px; }
+  nav.tabs button.activo { color: var(--azul); }
+
+  /* Botones estilo Duolingo */
+  .btn { display: block; width: 100%; border: none; border-radius: 16px; padding: 14px 16px; font: inherit;
+         font-weight: 800; text-transform: uppercase; letter-spacing: .5px; cursor: pointer;
+         background: var(--verde); color: #fff; box-shadow: 0 4px 0 var(--verde-osc); margin-bottom: 4px; }
+  .btn:active { transform: translateY(4px); box-shadow: none; }
+  .btn:disabled { background: var(--borde); color: var(--texto-suave); box-shadow: 0 4px 0 var(--borde-osc); cursor: default; transform: none; }
+  .btn.azul { background: var(--azul); box-shadow: 0 4px 0 var(--azul-osc); }
+  .btn.rojo { background: var(--rojo); box-shadow: 0 4px 0 var(--rojo-osc); }
+  .btn.borde { background: var(--superficie); color: var(--azul); border: 2px solid var(--borde); box-shadow: 0 4px 0 var(--borde); }
+  .btn.peq { width: auto; display: inline-block; padding: 8px 14px; font-size: 13px; border-radius: 12px; }
+  .fila { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+  /* Tarjetas */
+  .card { background: var(--superficie); border: 2px solid var(--borde); border-radius: 16px; padding: 16px; margin-bottom: 14px; }
+  .meta-dia { display: flex; align-items: center; gap: 12px; }
+  .barra { flex: 1; height: 16px; border-radius: 8px; background: var(--borde); overflow: hidden; }
+  .barra > div { height: 100%; background: var(--verde); border-radius: 8px; transition: width .4s; }
+  .barra.dorada > div { background: var(--dorado); }
+  .materia h3 { font-size: 18px; margin-bottom: 4px; overflow-wrap: anywhere; }
+  .materia .info { font-size: 14px; color: var(--texto-suave); margin-bottom: 10px; }
+  .pill { display: inline-block; font-size: 12px; font-weight: 800; padding: 2px 8px; border-radius: 999px; background: var(--sel); color: var(--azul); }
+  .pill.naranja { background: #fff4e0; color: #c96f00; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .pill.naranja { background: #3a2a10; color: var(--naranja); } }
+  :root[data-theme="dark"] .pill.naranja { background: #3a2a10; color: var(--naranja); }
+
+  /* Formularios */
+  label { display: block; font-weight: 700; margin: 12px 0 6px; }
+  input[type=text], select, textarea {
+    width: 100%; font: inherit; color: var(--texto); background: var(--superficie);
+    border: 2px solid var(--borde); border-radius: 12px; padding: 12px;
+  }
+  textarea { min-height: 200px; font-family: ui-monospace, monospace; font-size: 13px; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--azul); }
+  pre.prompt { white-space: pre-wrap; font-size: 13px; background: var(--fondo); border: 2px dashed var(--borde);
+               border-radius: 12px; padding: 12px; margin: 8px 0; max-height: 220px; overflow: auto; }
+  .aviso { font-size: 14px; padding: 10px 12px; border-radius: 12px; margin-top: 10px; }
+  .aviso.ok { background: var(--verde-claro); color: var(--verde-osc); }
+  .aviso.error { background: var(--rojo-claro); color: var(--rojo-osc); }
+
+  /* Lección */
+  .leccion { position: fixed; inset: 0; background: var(--fondo); z-index: 20; display: flex; flex-direction: column; }
+  .leccion .cab { display: flex; align-items: center; gap: 12px; padding: 16px; max-width: 560px; width: 100%; margin: 0 auto; }
+  .cerrar { background: none; border: none; font-size: 26px; color: var(--texto-suave); cursor: pointer; padding: 0 4px; }
+  .leccion .cuerpo { flex: 1; overflow-y: auto; padding: 8px 16px 16px; max-width: 560px; width: 100%; margin: 0 auto; }
+  .leccion .origen { font-size: 13px; font-weight: 800; text-transform: uppercase; color: var(--texto-suave); margin-bottom: 6px; }
+  .leccion .enunciado { font-size: 21px; font-weight: 800; margin-bottom: 20px; overflow-wrap: anywhere; }
+  .nueva { color: #ce82ff; }
+  .opcion { display: flex; gap: 12px; align-items: center; width: 100%; text-align: left; font: inherit; color: var(--texto);
+            background: var(--superficie); border: 2px solid var(--borde); border-bottom-width: 4px; border-radius: 14px;
+            padding: 14px; margin-bottom: 10px; cursor: pointer; }
+  .opcion .letra { flex: none; width: 30px; height: 30px; border: 2px solid var(--borde); border-radius: 8px; display: grid; place-items: center;
+                   font-size: 14px; font-weight: 800; color: var(--texto-suave); }
+  .opcion.sel { background: var(--sel); border-color: var(--sel-borde); }
+  .opcion.sel .letra { border-color: var(--sel-borde); color: var(--azul); }
+  .opcion.bien { background: var(--verde-claro); border-color: var(--verde); }
+  .opcion.mal { background: var(--rojo-claro); border-color: var(--rojo); }
+  .opcion:disabled { cursor: default; }
+  .pie { border-top: 2px solid var(--borde); padding: 16px; padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
+  .pie .inner { max-width: 560px; margin: 0 auto; }
+  .pie.bien { background: var(--verde-claro); border-color: transparent; }
+  .pie.mal { background: var(--rojo-claro); border-color: transparent; }
+  .pie .titulo { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
+  .pie.bien .titulo { color: var(--verde-osc); } .pie.mal .titulo { color: var(--rojo-osc); }
+  .pie .expl { font-size: 15px; margin-bottom: 12px; }
+
+  .fin { text-align: center; padding-top: 40px; }
+  .fin .grande { font-size: 64px; }
+  .fin .cajas { display: flex; gap: 12px; justify-content: center; margin: 24px 0; }
+  .fin .caja { border: 2px solid; border-radius: 14px; padding: 10px 16px; min-width: 110px; font-weight: 800; }
+  .fin .caja small { display: block; font-size: 12px; text-transform: uppercase; }
+  .caja.xp { border-color: var(--dorado); color: var(--dorado); }
+  .caja.prec { border-color: var(--verde); color: var(--verde); }
+  .caja.racha { border-color: var(--naranja); color: var(--naranja); }
+
+  .lista-preg { font-size: 14px; max-height: 300px; overflow: auto; margin-top: 8px; }
+  .lista-preg div { padding: 6px 0; border-bottom: 1px solid var(--borde); overflow-wrap: anywhere; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="stat racha" id="top-racha" title="Racha de días">🔥 <span>0</span></div>
+    <div class="stat xp" title="XP total">⭐ <span id="top-xp">0</span></div>
+    <div class="stat" title="Preguntas en el banco">📚 <span id="top-total">0</span></div>
+  </header>
+
+  <main>
+    <!-- APRENDER -->
+    <section id="tab-aprender">
+      <div class="card">
+        <div class="fila" style="justify-content:space-between;margin-bottom:8px">
+          <strong>Meta diaria</strong><span class="suave" id="meta-texto">0 / 20 XP</span>
+        </div>
+        <div class="meta-dia"><div class="barra dorada"><div id="meta-barra" style="width:0%"></div></div><span id="meta-ico">🎯</span></div>
+      </div>
+      <div id="repaso-general"></div>
+      <div id="lista-materias"></div>
+    </section>
+
+    <!-- IMPORTAR -->
+    <section id="tab-importar" class="oculto">
+      <h2>Agregar preguntas</h2>
+      <div class="card">
+        <strong>1. En NotebookLM</strong>
+        <p class="suave" style="margin-top:4px">Abre el cuaderno de tu materia y pega esta instrucción en el chat:</p>
+        <pre class="prompt" id="prompt-nlm"></pre>
+        <button class="btn azul" onclick="copiarPrompt()" id="btn-copiar">Copiar instrucción</button>
+      </div>
+      <div class="card">
+        <strong>2. Pega aquí la respuesta</strong>
+        <label for="imp-materia">Materia</label>
+        <select id="imp-materia" onchange="cambioMateria()"></select>
+        <input type="text" id="imp-nueva" placeholder="Nombre de la nueva materia" style="margin-top:8px">
+        <label for="imp-texto">Preguntas</label>
+        <textarea id="imp-texto" placeholder="P: ¿...?&#10;A) ...&#10;B) ...&#10;C) ...&#10;D) ...&#10;R: B&#10;E: ..." oninput="vistaPrevia()"></textarea>
+        <div id="imp-previa" class="suave" style="font-size:14px;margin:8px 0"></div>
+        <button class="btn" onclick="importar()" id="btn-importar" disabled>Agregar al banco</button>
+        <div id="imp-estado"></div>
+      </div>
+    </section>
+
+    <!-- AJUSTES -->
+    <section id="tab-ajustes" class="oculto">
+      <h2>Ajustes</h2>
+      <div class="card">
+        <label for="aj-meta" style="margin-top:0">Meta diaria</label>
+        <select id="aj-meta" onchange="cambiarMeta()">
+          <option value="10">Relajada: 10 XP</option>
+          <option value="20">Normal: 20 XP</option>
+          <option value="40">Seria: 40 XP</option>
+          <option value="60">Intensa: 60 XP</option>
+        </select>
+        <label for="aj-largo">Preguntas por lección</label>
+        <select id="aj-largo" onchange="cambiarLargo()">
+          <option value="5">5</option><option value="10">10</option><option value="15">15</option><option value="20">20</option>
+        </select>
+      </div>
+      <div class="card">
+        <strong>Materias</strong>
+        <div id="aj-materias" style="margin-top:8px"></div>
+      </div>
+      <div class="card">
+        <strong>Copia de seguridad</strong>
+        <p class="suave" style="margin-top:4px;font-size:14px">Tus preguntas y tu progreso solo se guardan en este navegador. Si borras los datos de Chrome, se pierden. Descarga una copia de vez en cuando.</p>
+        <div class="fila">
+          <button class="btn borde peq" onclick="exportar()">⬇️ Descargar copia</button>
+          <button class="btn borde peq" onclick="document.getElementById('aj-archivo').click()">⬆️ Restaurar copia</button>
+          <input type="file" id="aj-archivo" accept=".json,application/json" class="oculto" onchange="restaurar(this)">
+        </div>
+        <div id="aj-estado"></div>
+      </div>
+    </section>
+  </main>
+
+  <nav class="tabs"><div class="inner">
+    <button id="nav-aprender" class="activo" onclick="irA('aprender')"><span class="ico">🏠</span>Aprender</button>
+    <button id="nav-importar" onclick="irA('importar')"><span class="ico">➕</span>Agregar</button>
+    <button id="nav-ajustes" onclick="irA('ajustes')"><span class="ico">⚙️</span>Ajustes</button>
+  </div></nav>
+</div>
+
+<!-- Pantalla de lección -->
+<div class="leccion oculto" id="leccion">
+  <div class="cab">
+    <button class="cerrar" onclick="salirLeccion()" aria-label="Salir">✕</button>
+    <div class="barra"><div id="lec-barra" style="width:0%"></div></div>
+    <div class="stat vidas">❤️ <span id="lec-vidas">5</span></div>
+  </div>
+  <div class="cuerpo" id="lec-cuerpo">
+    <div class="origen" id="lec-origen"></div>
+    <div class="enunciado" id="lec-enunciado"></div>
+    <div id="lec-opciones"></div>
+  </div>
+  <div class="pie" id="lec-pie"><div class="inner">
+    <div id="lec-resultado" class="oculto">
+      <div class="titulo" id="lec-titulo"></div>
+      <div class="expl" id="lec-expl"></div>
+    </div>
+    <button class="btn" id="lec-boton" onclick="botonPie()" disabled>Comprobar</button>
+  </div></div>
+</div>
+
+<script>
+// ---------- Datos ----------
+const CLAVE = 'estudio_diario_v1';
+const DIAS_NIVEL = [0, 1, 3, 7, 14, 30, 60];   // días hasta el próximo repaso según el nivel
+const NIVEL_DOMINADA = 3;
+const VIDAS = 5;
+
+const PROMPT_NLM = `Crea 20 preguntas de opción múltiple basadas en las fuentes de este cuaderno. Cubre todos los temas importantes y varía la letra de la respuesta correcta.
+
+Responde SOLO con las preguntas, sin tablas, sin negritas y sin texto antes o después. Usa EXACTAMENTE este formato, con una línea en blanco entre preguntas:
+
+P: [pregunta]
+A) [opción]
+B) [opción]
+C) [opción]
+D) [opción]
+R: [letra correcta]
+E: [explicación breve de 1 o 2 frases]`;
+
+function cargar() {
+  let d = null;
+  try { d = JSON.parse(localStorage.getItem(CLAVE)); } catch (e) {}
+  if (!d) d = { preguntas: [], stats: {} };
+  d.stats = Object.assign({ xp: 0, racha: 0, ultimoDia: null, xpHoy: 0, diaXp: null, meta: 20, largo: 10 }, d.stats);
+  // Migrar el banco de la versión anterior de la app
+  try {
+    const viejo = JSON.parse(localStorage.getItem('banco_preguntas'));
+    if (Array.isArray(viejo) && viejo.length && !d.migrado) {
+      viejo.forEach(p => agregarPregunta(d, p.cuestionario || 'General', p));
+      d.migrado = true;
+    }
+  } catch (e) {}
+  return d;
+}
+function guardar() {
+  try { localStorage.setItem(CLAVE, JSON.stringify(datos)); }
+  catch (e) { alert('No se pudo guardar. Descarga una copia de seguridad en Ajustes.'); }
+}
+
+function hoy(offset = 0) {
+  const d = new Date(); d.setDate(d.getDate() + offset);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+function norm(s) { return String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim(); }
+
+function agregarPregunta(d, materia, p) {
+  const existe = d.preguntas.some(q => q.materia === materia && norm(q.pregunta) === norm(p.pregunta));
+  if (existe) return false;
+  d.preguntas.push({
+    id: uid(), materia, pregunta: p.pregunta, opciones: p.opciones, correcta: p.correcta,
+    explicacion: p.explicacion || '', nivel: 0, proximo: 0, vista: false, aciertos: 0, fallos: p.fallas || 0
+  });
+  return true;
+}
+
+let datos = cargar();
+
+function rachaActual() {
+  const s = datos.stats;
+  return (s.ultimoDia === hoy() || s.ultimoDia === hoy(-1)) ? s.racha : 0;
+}
+function xpDeHoy() { return datos.stats.diaXp === hoy() ? datos.stats.xpHoy : 0; }
+
+// ---------- Navegación ----------
+function irA(tab) {
+  ['aprender', 'importar', 'ajustes'].forEach(t => {
+    document.getElementById('tab-' + t).classList.toggle('oculto', t !== tab);
+    document.getElementById('nav-' + t).classList.toggle('activo', t === tab);
+  });
+  if (tab === 'aprender') pintarInicio();
+  if (tab === 'importar') pintarImportar();
+  if (tab === 'ajustes') pintarAjustes();
+  window.scrollTo(0, 0);
+}
+
+function materias() {
+  const m = {};
+  datos.preguntas.forEach(p => { (m[p.materia] = m[p.materia] || []).push(p); });
+  return m;
+}
+function pendientes(lista) {
+  const ahora = Date.now();
+  return lista.filter(p => p.vista && p.proximo <= ahora);
+}
+
+function el(tag, attrs = {}, ...hijos) {
+  const e = document.createElement(tag);
+  Object.entries(attrs).forEach(([k, v]) => k === 'onclick' ? e.onclick = v : e.setAttribute(k, v));
+  hijos.forEach(h => e.append(h));
+  return e;
+}
+
+function pintarTop() {
+  const r = rachaActual();
+  const topR = document.getElementById('top-racha');
+  topR.querySelector('span').textContent = r;
+  topR.classList.toggle('apagada', datos.stats.ultimoDia !== hoy());
+  document.getElementById('top-xp').textContent = datos.stats.xp;
+  document.getElementById('top-total').textContent = datos.preguntas.length;
+}
+
+function pintarInicio() {
+  pintarTop();
+  const meta = datos.stats.meta, xp = xpDeHoy();
+  document.getElementById('meta-texto').textContent = `${xp} / ${meta} XP`;
+  document.getElementById('meta-barra').style.width = Math.min(100, xp / meta * 100) + '%';
+  document.getElementById('meta-ico').textContent = xp >= meta ? '🏆' : '🎯';
+
+  const cont = document.getElementById('lista-materias');
+  const gen = document.getElementById('repaso-general');
+  cont.innerHTML = ''; gen.innerHTML = '';
+  const m = materias();
+  const nombres = Object.keys(m).sort((a, b) => a.localeCompare(b));
+
+  if (!nombres.length) {
+    cont.append(el('div', { class: 'card', style: 'text-align:center' },
+      el('div', { style: 'font-size:48px' }, '🦉'),
+      el('h3', {}, 'Aún no tienes preguntas'),
+      el('p', { class: 'suave' }, 'Saca preguntas de NotebookLM y pégalas en la pestaña Agregar.'),
+      el('button', { class: 'btn', onclick: () => irA('importar') }, 'Agregar preguntas')));
+    return;
+  }
+
+  const totalPend = pendientes(datos.preguntas).length;
+  if (nombres.length > 1 && totalPend > 0) {
+    gen.append(el('div', { class: 'card' },
+      el('h3', {}, '🔁 Repaso de todo'),
+      el('div', { class: 'info suave', style: 'margin-bottom:10px;font-size:14px' }, `${totalPend} ${totalPend === 1 ? 'pregunta' : 'preguntas'} para repasar hoy, de todas las materias`),
+      el('button', { class: 'btn azul', onclick: () => empezarLeccion(null) }, 'Repasar')));
+  }
+
+  nombres.forEach(nombre => {
+    const lista = m[nombre];
+    const dominadas = lista.filter(p => p.nivel >= NIVEL_DOMINADA).length;
+    const nuevas = lista.filter(p => !p.vista).length;
+    const pend = pendientes(lista).length;
+    const pct = Math.round(dominadas / lista.length * 100);
+    const etiquetas = el('div', { class: 'fila', style: 'margin-bottom:10px' });
+    if (pend) etiquetas.append(el('span', { class: 'pill naranja' }, `${pend} por repasar`));
+    if (nuevas) etiquetas.append(el('span', { class: 'pill' }, `${nuevas} nuevas`));
+    cont.append(el('div', { class: 'card materia' },
+      el('h3', {}, nombre),
+      el('div', { class: 'info' }, `${lista.length} ${lista.length === 1 ? 'pregunta' : 'preguntas'} · ${pct}% dominadas`),
+      el('div', { class: 'meta-dia', style: 'margin-bottom:12px' }, el('div', { class: 'barra' }, el('div', { style: `width:${pct}%` }))),
+      etiquetas,
+      el('button', { class: 'btn', onclick: () => empezarLeccion(nombre) }, pend || nuevas ? 'Empezar lección' : 'Practicar de nuevo')));
+  });
+}
+
+// ---------- Importar ----------
+function pintarImportar() {
+  pintarTop();
+  document.getElementById('prompt-nlm').textContent = PROMPT_NLM;
+  const sel = document.getElementById('imp-materia');
+  const actual = sel.value;
+  sel.innerHTML = '';
+  Object.keys(materias()).sort().forEach(n => sel.append(el('option', { value: n }, n)));
+  sel.append(el('option', { value: '__nueva__' }, '➕ Nueva materia…'));
+  if ([...sel.options].some(o => o.value === actual)) sel.value = actual;
+  cambioMateria();
+  vistaPrevia();
+}
+function cambioMateria() {
+  document.getElementById('imp-nueva').classList.toggle('oculto', document.getElementById('imp-materia').value !== '__nueva__');
+}
+
+async function copiarPrompt() {
+  const b = document.getElementById('btn-copiar');
+  try { await navigator.clipboard.writeText(PROMPT_NLM); b.textContent = '¡Copiada! ✓'; }
+  catch (e) {
+    const r = document.createRange(); r.selectNodeContents(document.getElementById('prompt-nlm'));
+    const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+    b.textContent = 'Mantén presionado y copia';
+  }
+  setTimeout(() => b.textContent = 'Copiar instrucción', 2500);
+}
+
+// Convierte una respuesta ("B", "b)", "2" o el texto de la opción) en el texto de la opción correcta
+function resolverCorrecta(resp, opciones) {
+  if (resp == null) return null;
+  if (typeof resp === 'number') return opciones[resp] ?? opciones[resp - 1] ?? null;
+  const r = String(resp).trim();
+  // Primero el texto exacto (para respuestas como "A la izquierda"), luego la letra
+  const exacta = opciones.find(o => norm(o) === norm(r));
+  if (exacta) return exacta;
+  const letra = r.match(/^\(?([A-Fa-f])\)?(?:[).:\s-]|$)/);
+  if (letra && opciones[letra[1].toUpperCase().charCodeAt(0) - 65] != null) {
+    return opciones[letra[1].toUpperCase().charCodeAt(0) - 65];
+  }
+  if (/^\d$/.test(r) && opciones[+r - 1] != null) return opciones[+r - 1];
+  const parcial = opciones.find(o => norm(r).includes(norm(o)) || norm(o).includes(norm(r)));
+  return parcial || null;
+}
+
+function limpiar(s) {
+  return s.replace(/\*\*|__|`/g, '')
+          .replace(/\s*\[\d+(?:\s*[,-]\s*\d+)*\]/g, '')   // citas de NotebookLM [1], [2, 3]
+          .trim();
+}
+
+function parsear(texto) {
+  const t = texto.trim().replace(/^```(?:json)?\s*|\s*```$/g, '');
+  if (t.startsWith('[') || t.startsWith('{')) {
+    try {
+      let arr = JSON.parse(t);
+      if (!Array.isArray(arr)) arr = arr.preguntas || arr.questions || [arr];
+      return arr.map(p => {
+        const opciones = (p.opciones || p.options || []).map(o => limpiar(String(o)).replace(/^[A-F][).:]\s+/, ''));
+        return { pregunta: limpiar(String(p.pregunta || p.question || '')), opciones,
+                 correcta: resolverCorrecta(p.correcta ?? p.respuesta ?? p.answer, opciones),
+                 explicacion: limpiar(String(p.explicacion || p.explanation || '')), fallas: p.fallas };
+      }).filter(valida);
+    } catch (e) { /* no es JSON; seguir con texto */ }
+  }
+
+  const salida = [];
+  let actual = null, campo = null;
+  const cerrar = () => {
+    if (!actual) return;
+    actual.correcta = resolverCorrecta(actual.resp, actual.opciones);
+    delete actual.resp;
+    if (valida(actual)) salida.push(actual);
+    actual = null;
+  };
+  t.split(/\r?\n/).forEach(linea => {
+    const l = limpiar(linea.replace(/^\s*[-•*]\s+/, ''));
+    if (!l) return;
+    let m;
+    if ((m = l.match(/^(?:P|Pregunta)\s*\d*\s*[:.)-]\s*(.+)/i)) || (m = l.match(/^\d{1,3}\s*[.)-]\s+(.+)/))) {
+      cerrar(); actual = { pregunta: m[1], opciones: [], resp: null, explicacion: '' }; campo = 'pregunta';
+    } else if (!actual) {
+      return;
+    } else if ((m = l.match(/^\(?([A-Fa-f])\s*[).:-]\s*(.+)/)) && campo !== 'explicacion' && actual.resp == null) {
+      actual.opciones.push(m[2]); campo = 'opcion';
+    } else if ((m = l.match(/^(?:R|Resp(?:uesta)?(?:\s+correcta)?|Correcta)\s*[:.-]\s*(.+)/i))) {
+      actual.resp = m[1]; campo = 'resp';
+    } else if ((m = l.match(/^(?:E|Explicaci[oó]n|Justificaci[oó]n)\s*[:.-]\s*(.+)/i))) {
+      actual.explicacion = m[1]; campo = 'explicacion';
+    } else if (campo === 'pregunta') {
+      actual.pregunta += ' ' + l;
+    } else if (campo === 'explicacion') {
+      actual.explicacion += ' ' + l;
+    } else if (campo === 'opcion') {
+      actual.opciones[actual.opciones.length - 1] += ' ' + l;
+    }
+  });
+  cerrar();
+  return salida;
+}
+function valida(p) {
+  return p.pregunta && Array.isArray(p.opciones) && p.opciones.length >= 2 && p.correcta != null;
+}
+
+let previa = [];
+function vistaPrevia() {
+  const txt = document.getElementById('imp-texto').value;
+  previa = txt.trim() ? parsear(txt) : [];
+  const box = document.getElementById('imp-previa');
+  document.getElementById('btn-importar').disabled = !previa.length;
+  document.getElementById('imp-estado').innerHTML = '';
+  if (!txt.trim()) { box.textContent = ''; return; }
+  const bloques = (txt.match(/^\s*(?:[-•*]\s*)?(?:\*\*)?(?:P|Pregunta)\s*\d*\s*[:.)-]|^\s*\d{1,3}\s*[.)-]\s/gim) || []).length;
+  box.innerHTML = '';
+  box.append(`✓ ${previa.length} preguntas reconocidas`);
+  if (bloques > previa.length) box.append(el('span', { style: 'color:var(--rojo)' }, ` · ${bloques - previa.length} con formato incompleto (se omitirán)`));
+  const lista = el('div', { class: 'lista-preg' });
+  previa.slice(0, 50).forEach((p, i) => lista.append(el('div', {}, `${i + 1}. ${p.pregunta}  →  ${p.correcta}`)));
+  box.append(lista);
+}
+
+function importar() {
+  const sel = document.getElementById('imp-materia').value;
+  const materia = sel === '__nueva__' ? document.getElementById('imp-nueva').value.trim() : sel;
+  const estado = document.getElementById('imp-estado');
+  if (!materia) { estado.innerHTML = ''; estado.append(el('div', { class: 'aviso error' }, 'Escribe el nombre de la materia.')); return; }
+  let nuevas = 0;
+  previa.forEach(p => { if (agregarPregunta(datos, materia, p)) nuevas++; });
+  guardar();
+  const repetidas = previa.length - nuevas;
+  document.getElementById('imp-texto').value = '';
+  document.getElementById('imp-nueva').value = '';
+  pintarImportar();
+  document.getElementById('imp-materia').value = materia;
+  cambioMateria();
+  estado.append(el('div', { class: 'aviso ok' }, `¡Listo! Se agregaron ${nuevas} preguntas a "${materia}".` + (repetidas ? ` ${repetidas} ya existían.` : '')));
+}
+
+// ---------- Ajustes ----------
+function pintarAjustes() {
+  pintarTop();
+  document.getElementById('aj-meta').value = datos.stats.meta;
+  document.getElementById('aj-largo').value = datos.stats.largo;
+  const cont = document.getElementById('aj-materias');
+  cont.innerHTML = '';
+  const m = materias();
+  const nombres = Object.keys(m).sort();
+  if (!nombres.length) cont.append(el('p', { class: 'suave' }, 'No hay materias todavía.'));
+  nombres.forEach(n => cont.append(el('div', { class: 'fila', style: 'justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--borde)' },
+    el('span', { style: 'overflow-wrap:anywhere;flex:1' }, `${n} (${m[n].length})`),
+    el('div', { class: 'fila' },
+      el('button', { class: 'btn borde peq', onclick: () => renombrar(n) }, 'Renombrar'),
+      el('button', { class: 'btn rojo peq', onclick: () => borrarMateria(n) }, 'Borrar')))));
+}
+function cambiarMeta() { datos.stats.meta = +document.getElementById('aj-meta').value; guardar(); }
+function cambiarLargo() { datos.stats.largo = +document.getElementById('aj-largo').value; guardar(); }
+function renombrar(n) {
+  const nuevo = (prompt('Nuevo nombre para la materia:', n) || '').trim();
+  if (!nuevo || nuevo === n) return;
+  datos.preguntas.forEach(p => { if (p.materia === n) p.materia = nuevo; });
+  guardar(); pintarAjustes();
+}
+function borrarMateria(n) {
+  const cant = datos.preguntas.filter(p => p.materia === n).length;
+  if (!confirm(`¿Borrar "${n}" y sus ${cant} preguntas? No se puede deshacer.`)) return;
+  datos.preguntas = datos.preguntas.filter(p => p.materia !== n);
+  guardar(); pintarAjustes();
+}
+function exportar() {
+  const blob = new Blob([JSON.stringify(datos, null, 1)], { type: 'application/json' });
+  const a = el('a', { href: URL.createObjectURL(blob), download: `estudio-copia-${hoy()}.json` });
+  document.body.append(a); a.click(); a.remove();
+}
+function restaurar(input) {
+  const f = input.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    const estado = document.getElementById('aj-estado'); estado.innerHTML = '';
+    try {
+      const d = JSON.parse(r.result);
+      if (!Array.isArray(d.preguntas)) throw new Error();
+      if (!confirm(`La copia tiene ${d.preguntas.length} preguntas. Reemplazará todo lo que tienes ahora. ¿Continuar?`)) return;
+      localStorage.setItem(CLAVE, JSON.stringify(d));
+      datos = cargar();
+      estado.append(el('div', { class: 'aviso ok' }, 'Copia restaurada.'));
+      pintarAjustes();
+    } catch (e) { estado.append(el('div', { class: 'aviso error' }, 'Ese archivo no es una copia válida.')); }
+    input.value = '';
+  };
+  r.readAsText(f);
+}
+
+// ---------- Lección ----------
+let lec = null;
+
+function barajar(a) {
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+
+function elegirPreguntas(materia) {
+  const largo = datos.stats.largo;
+  const pool = datos.preguntas.filter(p => materia === null || p.materia === materia);
+  const pend = barajar(pendientes(pool)).sort((a, b) => a.nivel - b.nivel);
+  const nuevas = pool.filter(p => !p.vista);
+  let elegidas = pend.slice(0, Math.ceil(largo * 0.7));
+  elegidas = elegidas.concat(nuevas.slice(0, largo - elegidas.length));
+  if (elegidas.length < largo) {
+    // Completar con las que más cuesten (nivel bajo, más fallos) aunque no toque repasarlas
+    const resto = barajar(pool.filter(p => !elegidas.includes(p)))
+      .sort((a, b) => (a.nivel - b.nivel) || (b.fallos - a.fallos));
+    elegidas = elegidas.concat(resto.slice(0, largo - elegidas.length));
+  }
+  return barajar(elegidas);
+}
+
+function empezarLeccion(materia) {
+  const cola = elegirPreguntas(materia);
+  if (!cola.length) return;
+  lec = { materia, cola, total: cola.length, hechas: 0, vidas: VIDAS, xp: 0, primeras: 0, falladas: new Set(), estado: 'responder', sel: null };
+  document.getElementById('leccion').classList.remove('oculto');
+  document.body.style.overflow = 'hidden';
+  mostrarPregunta();
+}
+
+function mostrarPregunta() {
+  const p = lec.cola[0];
+  lec.estado = 'responder'; lec.sel = null;
+  document.getElementById('lec-barra').style.width = (lec.hechas / lec.total * 100) + '%';
+  document.getElementById('lec-vidas').textContent = lec.vidas;
+  const origen = document.getElementById('lec-origen');
+  origen.innerHTML = '';
+  if (!p.vista) origen.append(el('span', { class: 'nueva' }, '✨ Pregunta nueva · '));
+  else if (lec.falladas.has(p.id)) origen.append(el('span', { style: 'color:var(--rojo)' }, '↺ Otra vez · '));
+  origen.append(p.materia);
+  document.getElementById('lec-enunciado').textContent = p.pregunta;
+
+  const fijas = p.opciones.some(o => /todas las anteriores|ninguna de las anteriores|ambas|a y b|all of the above|none of the above/i.test(o));
+  const opciones = fijas ? [...p.opciones] : barajar([...p.opciones]);
+  const cont = document.getElementById('lec-opciones');
+  cont.innerHTML = '';
+  opciones.forEach((o, i) => {
+    const b = el('button', { class: 'opcion' }, el('span', { class: 'letra' }, String(i + 1)), el('span', {}, o));
+    b.dataset.valor = o;
+    b.onclick = () => {
+      if (lec.estado !== 'responder') return;
+      cont.querySelectorAll('.opcion').forEach(x => x.classList.remove('sel'));
+      b.classList.add('sel'); lec.sel = o;
+      document.getElementById('lec-boton').disabled = false;
+    };
+    cont.append(b);
+  });
+
+  const pie = document.getElementById('lec-pie');
+  pie.className = 'pie';
+  document.getElementById('lec-resultado').classList.add('oculto');
+  const boton = document.getElementById('lec-boton');
+  boton.textContent = 'Comprobar'; boton.className = 'btn'; boton.disabled = true;
+  document.getElementById('lec-cuerpo').scrollTop = 0;
+}
+
+function botonPie() {
+  if (!lec) return;
+  if (lec.estado === 'responder') comprobar();
+  else if (lec.estado === 'revisado') siguiente();
+  else if (lec.estado === 'fin') salirLeccion(true);
+}
+
+function comprobar() {
+  if (lec.sel == null) return;
+  const p = lec.cola[0];
+  const bien = lec.sel === p.correcta;
+  const primeraVez = !lec.falladas.has(p.id);
+  lec.estado = 'revisado';
+
+  document.querySelectorAll('#lec-opciones .opcion').forEach(b => {
+    b.disabled = true; b.classList.remove('sel');
+    if (b.dataset.valor === p.correcta) b.classList.add('bien');
+    else if (b.dataset.valor === lec.sel) b.classList.add('mal');
+  });
+
+  p.vista = true;
+  if (bien) {
+    p.aciertos++;
+    if (primeraVez) {
+      p.nivel = Math.min(p.nivel + 1, DIAS_NIVEL.length - 1);
+      lec.xp += 2; lec.primeras++;
+    }
+    // Si la falló en esta lección, queda en nivel bajo y vuelve mañana
+    p.proximo = Date.now() + DIAS_NIVEL[primeraVez ? p.nivel : 1] * 864e5 - 36e5;
+    lec.cola.shift(); lec.hechas++;
+  } else {
+    p.fallos++;
+    p.nivel = Math.max(0, p.nivel - 2);
+    p.proximo = 0;
+    lec.falladas.add(p.id);
+    lec.vidas--;
+    // Duolingo: la pregunta fallada vuelve al final de la lección
+    lec.cola.push(lec.cola.shift());
+  }
+  guardar();
+
+  const pie = document.getElementById('lec-pie');
+  pie.className = 'pie ' + (bien ? 'bien' : 'mal');
+  document.getElementById('lec-resultado').classList.remove('oculto');
+  document.getElementById('lec-titulo').textContent = bien
+    ? ['¡Excelente!', '¡Bien hecho!', '¡Correcto!', '¡Genial!'][Math.floor(Math.random() * 4)]
+    : 'Respuesta correcta:';
+  const expl = document.getElementById('lec-expl');
+  expl.innerHTML = '';
+  if (!bien) expl.append(el('strong', {}, p.correcta), el('br'));
+  if (p.explicacion) expl.append(p.explicacion);
+  const boton = document.getElementById('lec-boton');
+  boton.textContent = 'Continuar';
+  boton.className = 'btn' + (bien ? '' : ' rojo');
+  document.getElementById('lec-vidas').textContent = lec.vidas;
+  document.getElementById('lec-barra').style.width = (lec.hechas / lec.total * 100) + '%';
+}
+
+function siguiente() {
+  if (lec.vidas <= 0 || !lec.cola.length) terminar(lec.vidas > 0);
+  else mostrarPregunta();
+}
+
+function terminar(completa) {
+  lec.estado = 'fin';
+  if (completa) lec.xp += 5;
+  const s = datos.stats;
+  const antes = rachaActual();
+  if (lec.xp > 0 || completa) {
+    if (s.ultimoDia !== hoy()) { s.racha = s.ultimoDia === hoy(-1) ? s.racha + 1 : 1; s.ultimoDia = hoy(); }
+    if (s.diaXp !== hoy()) { s.diaXp = hoy(); s.xpHoy = 0; }
+    s.xpHoy += lec.xp; s.xp += lec.xp;
+  }
+  guardar();
+
+  const prec = Math.round(lec.primeras / lec.total * 100);
+  const cuerpo = document.getElementById('lec-cuerpo');
+  document.getElementById('lec-barra').style.width = completa ? '100%' : document.getElementById('lec-barra').style.width;
+  cuerpo.innerHTML = '';
+  cuerpo.append(el('div', { class: 'fin' },
+    el('div', { class: 'grande' }, completa ? (prec === 100 ? '🏆' : '🎉') : '💔'),
+    el('h2', {}, completa ? (prec === 100 ? '¡Lección perfecta!' : '¡Lección completada!') : 'Te quedaste sin vidas'),
+    el('p', { class: 'suave' }, completa ? 'Tu progreso quedó guardado.' : 'Tranquilo, lo que respondiste quedó guardado. Las que fallaste volverán pronto.'),
+    el('div', { class: 'cajas' },
+      el('div', { class: 'caja xp' }, el('small', {}, 'XP'), '⭐ ' + lec.xp),
+      el('div', { class: 'caja prec' }, el('small', {}, 'Precisión'), '🎯 ' + prec + '%'),
+      el('div', { class: 'caja racha' }, el('small', {}, 'Racha'), '🔥 ' + rachaActual())),
+    rachaActual() > antes ? el('p', { style: 'color:var(--naranja);font-weight:800' }, `¡Racha de ${rachaActual()} ${rachaActual() === 1 ? 'día' : 'días'}!`) : ''));
+  document.getElementById('lec-pie').className = 'pie';
+  document.getElementById('lec-resultado').classList.add('oculto');
+  const boton = document.getElementById('lec-boton');
+  boton.textContent = 'Continuar'; boton.className = 'btn'; boton.disabled = false;
+}
+
+function salirLeccion(sinPreguntar) {
+  if (!sinPreguntar && lec && lec.estado !== 'fin' && lec.hechas > 0 && !confirm('¿Salir de la lección? Lo respondido queda guardado, pero no ganas el bono de XP.')) return;
+  lec = null;
+  document.getElementById('leccion').classList.add('oculto');
+  document.body.style.overflow = '';
+  // Restaurar la estructura de la lección para la próxima vez
+  document.getElementById('lec-cuerpo').innerHTML =
+    '<div class="origen" id="lec-origen"></div><div class="enunciado" id="lec-enunciado"></div><div id="lec-opciones"></div>';
+  irA('aprender');
+}
+
+// Teclado: 1-6 para elegir, Enter para comprobar/continuar
+document.addEventListener('keydown', e => {
+  if (!lec) return;
+  if (e.key === 'Enter') { e.preventDefault(); if (!document.getElementById('lec-boton').disabled) botonPie(); }
+  const n = parseInt(e.key);
+  if (lec.estado === 'responder' && n >= 1) { const b = document.querySelectorAll('#lec-opciones .opcion')[n - 1]; if (b) b.click(); }
+});
+
+// Funciona sin internet una vez instalada
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+
+guardar();
+irA('aprender');
+</script>
+</body>
+</html>
