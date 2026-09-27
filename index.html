@@ -380,7 +380,7 @@ function pintarInicio() {
     const pct = Math.round(dominadas / lista.length * 100);
     const etiquetas = el('div', { class: 'fila', style: 'margin-bottom:10px' });
     if (pend) etiquetas.append(el('span', { class: 'pill naranja' }, `${pend} por repasar`));
-    if (nuevas) etiquetas.append(el('span', { class: 'pill' }, `${nuevas} nuevas`));
+    if (nuevas) etiquetas.append(el('span', { class: 'pill' }, `${nuevas} ${nuevas === 1 ? 'nueva' : 'nuevas'}`));
     cont.append(el('div', { class: 'card materia' },
       el('h3', {}, nombre),
       el('div', { class: 'info' }, `${lista.length} ${lista.length === 1 ? 'pregunta' : 'preguntas'} · ${pct}% dominadas`),
