@@ -46,7 +46,7 @@
   .top { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px;
          border-bottom: 2px solid var(--borde); position: sticky; top: 0; background: var(--fondo); z-index: 5; }
   .stat { font-weight: 800; display: flex; gap: 4px; align-items: center; }
-  .stat.racha { color: var(--naranja); } .stat.xp { color: var(--dorado); } .stat.vidas { color: var(--rojo); }
+  .stat.racha { color: var(--naranja); } .stat.xp { color: var(--dorado); } .stat.conoc { color: #a560e8; }
   .stat.apagada { color: var(--texto-suave); filter: grayscale(1); }
 
   /* Navegación inferior */
@@ -125,12 +125,13 @@
 
   .fin { text-align: center; padding-top: 40px; }
   .fin .grande { font-size: 64px; }
-  .fin .cajas { display: flex; gap: 12px; justify-content: center; margin: 24px 0; }
-  .fin .caja { border: 2px solid; border-radius: 14px; padding: 10px 16px; min-width: 110px; font-weight: 800; }
-  .fin .caja small { display: block; font-size: 12px; text-transform: uppercase; }
+  .fin .cajas { display: flex; gap: 8px; justify-content: center; margin: 24px 0; }
+  .fin .caja { flex: 1; max-width: 140px; border: 2px solid; border-radius: 14px; padding: 10px 6px; font-weight: 800; }
+  .fin .caja small { display: block; font-size: 11px; text-transform: uppercase; }
   .caja.xp { border-color: var(--dorado); color: var(--dorado); }
   .caja.prec { border-color: var(--verde); color: var(--verde); }
-  .caja.racha { border-color: var(--naranja); color: var(--naranja); }
+  .caja.conoc { border-color: #ce82ff; color: #a560e8; }
+  .desglose { font-size: 13px; color: var(--texto-suave); margin: -4px 0 10px; }
 
   .lista-preg { font-size: 14px; max-height: 300px; overflow: auto; margin-top: 8px; }
   .lista-preg div { padding: 6px 0; border-bottom: 1px solid var(--borde); overflow-wrap: anywhere; }
@@ -164,7 +165,10 @@
         <strong>1. En NotebookLM</strong>
         <p class="suave" style="margin-top:4px">Abre el cuaderno de tu materia y pega esta instrucción en el chat:</p>
         <pre class="prompt" id="prompt-nlm"></pre>
-        <button class="btn azul" onclick="copiarPrompt()" id="btn-copiar">Copiar instrucción</button>
+        <button class="btn azul" onclick="copiarPrompt('nlm', this)">Copiar instrucción</button>
+        <p class="suave" style="margin:14px 0 4px;font-size:14px">¿Quieres más? En el mismo chat, pega esto:</p>
+        <pre class="prompt" id="prompt-mas"></pre>
+        <button class="btn borde" onclick="copiarPrompt('mas', this)">Copiar "dame más"</button>
       </div>
       <div class="card">
         <strong>2. Pega aquí la respuesta</strong>
@@ -172,7 +176,7 @@
         <select id="imp-materia" onchange="cambioMateria()"></select>
         <input type="text" id="imp-nueva" placeholder="Nombre de la nueva materia" style="margin-top:8px">
         <label for="imp-texto">Preguntas</label>
-        <textarea id="imp-texto" placeholder="P: ¿...?&#10;A) ...&#10;B) ...&#10;C) ...&#10;D) ...&#10;R: B&#10;E: ..." oninput="vistaPrevia()"></textarea>
+        <textarea id="imp-texto" placeholder="P: ¿...?&#10;A) ...&#10;B) ...&#10;C) ...&#10;D) ...&#10;R: B&#10;N: media&#10;E: ..." oninput="vistaPrevia()"></textarea>
         <div id="imp-previa" class="suave" style="font-size:14px;margin:8px 0"></div>
         <button class="btn" onclick="importar()" id="btn-importar" disabled>Agregar al banco</button>
         <div id="imp-estado"></div>
@@ -224,7 +228,7 @@
   <div class="cab">
     <button class="cerrar" onclick="salirLeccion()" aria-label="Salir">✕</button>
     <div class="barra"><div id="lec-barra" style="width:0%"></div></div>
-    <div class="stat vidas">❤️ <span id="lec-vidas">5</span></div>
+    <div class="stat conoc" title="Tu conocimiento en esta materia (0 a 100)">🧠 <span id="lec-conoc">0</span></div>
   </div>
   <div class="cuerpo" id="lec-cuerpo">
     <div class="origen" id="lec-origen"></div>
@@ -244,12 +248,37 @@
 // ---------- Datos ----------
 const CLAVE = 'estudio_diario_v1';
 const DIAS_NIVEL = [0, 1, 3, 7, 14, 30, 60];   // días hasta el próximo repaso según el nivel
-const NIVEL_DOMINADA = 3;
-const VIDAS = 5;
+const NIVEL_PLENO = 4;   // nivel desde el que una pregunta cuenta como dominada al 100 %
+const DIFICULTADES = {
+  facil:   { nombre: 'Fácil',   peso: 1, ico: '🟢' },
+  media:   { nombre: 'Media',   peso: 2, ico: '🟡' },
+  dificil: { nombre: 'Difícil', peso: 3, ico: '🔴' },
+};
+const GRADOS = [[0, 'Principiante', '🌱'], [20, 'Básico', '📘'], [40, 'Intermedio', '📗'], [60, 'Avanzado', '🎓'], [80, 'Experto', '🏅']];
 
-const PROMPT_NLM = `Crea 20 preguntas de opción múltiple basadas en las fuentes de este cuaderno. Cubre todos los temas importantes y varía la letra de la respuesta correcta.
+const PROMPT_NLM = `Actúa como un profesor universitario experto que prepara un examen sobre las fuentes de este cuaderno. Crea 20 preguntas de opción múltiple.
 
-Responde SOLO con las preguntas, sin tablas, sin negritas y sin texto antes o después. Usa EXACTAMENTE este formato, con una línea en blanco entre preguntas:
+DIFICULTAD: 6 fáciles, 8 medias y 6 difíciles, mezcladas.
+- Fácil: recordar una definición, fórmula, dato o concepto clave.
+- Media: comprender y aplicar: explicar por qué, elegir el método correcto, resolver un caso sencillo.
+- Difícil: analizar en varios pasos: casos nuevos, comparar conceptos que se confunden, encontrar el error en un razonamiento, combinar temas distintos.
+
+DISTRACTORES (opciones incorrectas):
+- Siempre 4 opciones y una sola correcta.
+- Cada opción incorrecta debe ser un error que un estudiante cometería de verdad: confundir conceptos parecidos, equivocarse en un signo o en un paso, usar la fórmula o el método de otro caso, o una afirmación verdadera que no responde a esta pregunta.
+- Todas las opciones del mismo tipo, estilo y largo parecido. Nada absurdo ni que se descarte a simple vista.
+- No uses "todas las anteriores", "ninguna de las anteriores" ni "A y B".
+- La correcta no debe ser la más larga ni la única que repite palabras del enunciado.
+
+CALIDAD:
+- Cubre todos los temas de las fuentes, no solo los primeros, y no repitas la misma idea.
+- Cada pregunta debe entenderse sola: no digas "según el texto" ni "en la fuente".
+- Reparte la respuesta correcta entre A, B, C y D más o menos por igual.
+- Escribe las fórmulas en texto simple (por ejemplo x^2, √x, ∫ f(x) dx, dy/dx), sin LaTeX.
+- En la explicación di por qué la correcta es correcta y cuál es el error de la opción incorrecta más tentadora.
+- Usa solo información de las fuentes; no inventes.
+
+FORMATO: responde SOLO con las preguntas, sin tablas, sin negritas y sin texto antes o después, con una línea en blanco entre preguntas:
 
 P: [pregunta]
 A) [opción]
@@ -257,7 +286,31 @@ B) [opción]
 C) [opción]
 D) [opción]
 R: [letra correcta]
-E: [explicación breve de 1 o 2 frases]`;
+N: [fácil, media o difícil]
+E: [explicación de 1 a 3 frases]`;
+
+const PROMPT_MAS = `Dame 20 preguntas más, distintas a todas las anteriores, con las mismas reglas de dificultad, distractores, calidad y formato. Prioriza los temas y conceptos que todavía no has cubierto.`;
+
+function dificultadDe(p) { return DIFICULTADES[p.dificultad] ? p.dificultad : 'media'; }
+function leerDificultad(s) {
+  const n = norm(s || '');
+  if (!n) return undefined;
+  if (/^(facil|basic|easy|baja|sencill)/.test(n)) return 'facil';
+  if (/^(dificil|hard|alta|avanzad|complej)/.test(n)) return 'dificil';
+  return 'media';
+}
+// Puntaje de conocimiento 0-100: promedio del dominio de cada pregunta, pesado por dificultad
+function conocimiento(lista) {
+  let suma = 0, total = 0;
+  const por = {};
+  lista.forEach(p => {
+    const d = dificultadDe(p), w = DIFICULTADES[d].peso, m = Math.min(p.nivel, NIVEL_PLENO) / NIVEL_PLENO;
+    suma += w * m; total += w;
+    por[d] = por[d] || { s: 0, n: 0 }; por[d].s += m; por[d].n++;
+  });
+  return { puntaje: total ? Math.round(suma / total * 100) : 0, por };
+}
+function grado(puntaje) { return GRADOS.filter(g => puntaje >= g[0]).pop(); }
 
 function cargar() {
   let d = null;
@@ -287,11 +340,11 @@ function uid() { return Date.now().toString(36) + Math.random().toString(36).sli
 function norm(s) { return String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim(); }
 
 function agregarPregunta(d, materia, p) {
-  const existe = d.preguntas.some(q => q.materia === materia && norm(q.pregunta) === norm(p.pregunta));
-  if (existe) return false;
+  const existe = d.preguntas.find(q => q.materia === materia && norm(q.pregunta) === norm(p.pregunta));
+  if (existe) { if (!existe.dificultad && p.dificultad) existe.dificultad = p.dificultad; return false; }
   d.preguntas.push({
     id: uid(), materia, pregunta: p.pregunta, opciones: p.opciones, correcta: p.correcta,
-    explicacion: p.explicacion || '', nivel: 0, proximo: 0, vista: false, aciertos: 0, fallos: p.fallas || 0
+    explicacion: p.explicacion || '', dificultad: p.dificultad, nivel: 0, proximo: 0, vista: false, aciertos: 0, fallos: p.fallas || 0
   });
   return true;
 }
@@ -374,17 +427,19 @@ function pintarInicio() {
 
   nombres.forEach(nombre => {
     const lista = m[nombre];
-    const dominadas = lista.filter(p => p.nivel >= NIVEL_DOMINADA).length;
+    const { puntaje, por } = conocimiento(lista);
+    const [, gNombre, gIco] = grado(puntaje);
     const nuevas = lista.filter(p => !p.vista).length;
     const pend = pendientes(lista).length;
-    const pct = Math.round(dominadas / lista.length * 100);
     const etiquetas = el('div', { class: 'fila', style: 'margin-bottom:10px' });
     if (pend) etiquetas.append(el('span', { class: 'pill naranja' }, `${pend} por repasar`));
     if (nuevas) etiquetas.append(el('span', { class: 'pill' }, `${nuevas} ${nuevas === 1 ? 'nueva' : 'nuevas'}`));
     cont.append(el('div', { class: 'card materia' },
       el('h3', {}, nombre),
-      el('div', { class: 'info' }, `${lista.length} ${lista.length === 1 ? 'pregunta' : 'preguntas'} · ${pct}% dominadas`),
-      el('div', { class: 'meta-dia', style: 'margin-bottom:12px' }, el('div', { class: 'barra' }, el('div', { style: `width:${pct}%` }))),
+      el('div', { class: 'info' }, `${gIco} ${gNombre} · 🧠 ${puntaje}/100 · ${lista.length} ${lista.length === 1 ? 'pregunta' : 'preguntas'}`),
+      el('div', { class: 'meta-dia', style: 'margin-bottom:12px' }, el('div', { class: 'barra' }, el('div', { style: `width:${puntaje}%` }))),
+      el('div', { class: 'desglose' }, Object.keys(DIFICULTADES).filter(d => por[d])
+        .map(d => `${DIFICULTADES[d].ico} ${DIFICULTADES[d].nombre} ${Math.round(por[d].s / por[d].n * 100)}%`).join('  ·  ')),
       etiquetas,
       el('button', { class: 'btn', onclick: () => empezarLeccion(nombre) }, pend || nuevas ? 'Empezar lección' : 'Practicar de nuevo')));
   });
@@ -394,6 +449,7 @@ function pintarInicio() {
 function pintarImportar() {
   pintarTop();
   document.getElementById('prompt-nlm').textContent = PROMPT_NLM;
+  document.getElementById('prompt-mas').textContent = PROMPT_MAS;
   const sel = document.getElementById('imp-materia');
   const actual = sel.value;
   sel.innerHTML = '';
@@ -407,15 +463,16 @@ function cambioMateria() {
   document.getElementById('imp-nueva').classList.toggle('oculto', document.getElementById('imp-materia').value !== '__nueva__');
 }
 
-async function copiarPrompt() {
-  const b = document.getElementById('btn-copiar');
-  try { await navigator.clipboard.writeText(PROMPT_NLM); b.textContent = '¡Copiada! ✓'; }
+async function copiarPrompt(cual, b) {
+  const texto = cual === 'mas' ? PROMPT_MAS : PROMPT_NLM;
+  const antes = b.textContent;
+  try { await navigator.clipboard.writeText(texto); b.textContent = '¡Copiado! ✓'; }
   catch (e) {
-    const r = document.createRange(); r.selectNodeContents(document.getElementById('prompt-nlm'));
+    const r = document.createRange(); r.selectNodeContents(document.getElementById('prompt-' + cual));
     const s = getSelection(); s.removeAllRanges(); s.addRange(r);
     b.textContent = 'Mantén presionado y copia';
   }
-  setTimeout(() => b.textContent = 'Copiar instrucción', 2500);
+  setTimeout(() => b.textContent = antes, 2500);
 }
 
 // Convierte una respuesta ("B", "b)", "2" o el texto de la opción) en el texto de la opción correcta
@@ -451,7 +508,8 @@ function parsear(texto) {
         const opciones = (p.opciones || p.options || []).map(o => limpiar(String(o)).replace(/^[A-F][).:]\s+/, ''));
         return { pregunta: limpiar(String(p.pregunta || p.question || '')), opciones,
                  correcta: resolverCorrecta(p.correcta ?? p.respuesta ?? p.answer, opciones),
-                 explicacion: limpiar(String(p.explicacion || p.explanation || '')), fallas: p.fallas };
+                 explicacion: limpiar(String(p.explicacion || p.explanation || '')), fallas: p.fallas,
+                 dificultad: leerDificultad(p.dificultad || p.difficulty || p.nivel) };
       }).filter(valida);
     } catch (e) { /* no es JSON; seguir con texto */ }
   }
@@ -477,6 +535,8 @@ function parsear(texto) {
       actual.opciones.push(m[2]); campo = 'opcion';
     } else if ((m = l.match(/^(?:R|Resp(?:uesta)?(?:\s+correcta)?|Correcta)\s*[:.-]\s*(.+)/i))) {
       actual.resp = m[1]; campo = 'resp';
+    } else if ((m = l.match(/^(?:N|Nivel|Dificultad)\s*[:.-]\s*(.+)/i))) {
+      actual.dificultad = leerDificultad(m[1]); campo = 'nivel';
     } else if ((m = l.match(/^(?:E|Explicaci[oó]n|Justificaci[oó]n)\s*[:.-]\s*(.+)/i))) {
       actual.explicacion = m[1]; campo = 'explicacion';
     } else if (campo === 'pregunta') {
@@ -507,7 +567,9 @@ function vistaPrevia() {
   box.append(`✓ ${previa.length} preguntas reconocidas`);
   if (bloques > previa.length) box.append(el('span', { style: 'color:var(--rojo)' }, ` · ${bloques - previa.length} con formato incompleto (se omitirán)`));
   const lista = el('div', { class: 'lista-preg' });
-  previa.slice(0, 50).forEach((p, i) => lista.append(el('div', {}, `${i + 1}. ${p.pregunta}  →  ${p.correcta}`)));
+  previa.slice(0, 50).forEach((p, i) => lista.append(el('div', {}, `${DIFICULTADES[dificultadDe(p)].ico} ${i + 1}. ${p.pregunta}  →  ${p.correcta}`)));
+  const cuenta = Object.keys(DIFICULTADES).map(d => [d, previa.filter(p => dificultadDe(p) === d).length]).filter(x => x[1]);
+  box.insertBefore(el('div', {}, cuenta.map(([d, n]) => `${DIFICULTADES[d].ico} ${n} ${DIFICULTADES[d].nombre.toLowerCase()}`).join(' · ')), lista);
   box.append(lista);
 }
 
@@ -594,7 +656,8 @@ function elegirPreguntas(materia) {
   const largo = datos.stats.largo;
   const pool = datos.preguntas.filter(p => materia === null || p.materia === materia);
   const pend = barajar(pendientes(pool)).sort((a, b) => a.nivel - b.nivel);
-  const nuevas = pool.filter(p => !p.vista);
+  // Las nuevas entran de la más fácil a la más difícil
+  const nuevas = barajar(pool.filter(p => !p.vista)).sort((a, b) => DIFICULTADES[dificultadDe(a)].peso - DIFICULTADES[dificultadDe(b)].peso);
   let elegidas = pend.slice(0, Math.ceil(largo * 0.7));
   elegidas = elegidas.concat(nuevas.slice(0, largo - elegidas.length));
   if (elegidas.length < largo) {
@@ -609,7 +672,8 @@ function elegirPreguntas(materia) {
 function empezarLeccion(materia) {
   const cola = elegirPreguntas(materia);
   if (!cola.length) return;
-  lec = { materia, cola, total: cola.length, hechas: 0, vidas: VIDAS, xp: 0, primeras: 0, falladas: new Set(), estado: 'responder', sel: null };
+  const pool = datos.preguntas.filter(p => materia === null || p.materia === materia);
+  lec = { materia, cola, pool, antes: conocimiento(pool).puntaje, total: cola.length, hechas: 0, xp: 0, primeras: 0, falladas: new Set(), estado: 'responder', sel: null };
   document.getElementById('leccion').classList.remove('oculto');
   document.body.style.overflow = 'hidden';
   mostrarPregunta();
@@ -619,12 +683,13 @@ function mostrarPregunta() {
   const p = lec.cola[0];
   lec.estado = 'responder'; lec.sel = null;
   document.getElementById('lec-barra').style.width = (lec.hechas / lec.total * 100) + '%';
-  document.getElementById('lec-vidas').textContent = lec.vidas;
+  document.getElementById('lec-conoc').textContent = conocimiento(lec.pool).puntaje;
   const origen = document.getElementById('lec-origen');
   origen.innerHTML = '';
   if (!p.vista) origen.append(el('span', { class: 'nueva' }, '✨ Pregunta nueva · '));
   else if (lec.falladas.has(p.id)) origen.append(el('span', { style: 'color:var(--rojo)' }, '↺ Otra vez · '));
-  origen.append(p.materia);
+  const dif = DIFICULTADES[dificultadDe(p)];
+  origen.append(`${dif.ico} ${dif.nombre} · ${p.materia}`);
   document.getElementById('lec-enunciado').textContent = p.pregunta;
 
   const fijas = p.opciones.some(o => /todas las anteriores|ninguna de las anteriores|ambas|a y b|all of the above|none of the above/i.test(o));
@@ -676,7 +741,7 @@ function comprobar() {
     p.aciertos++;
     if (primeraVez) {
       p.nivel = Math.min(p.nivel + 1, DIAS_NIVEL.length - 1);
-      lec.xp += 2; lec.primeras++;
+      lec.xp += 1 + DIFICULTADES[dificultadDe(p)].peso; lec.primeras++;   // 2, 3 o 4 XP según dificultad
     }
     // Si la falló en esta lección, queda en nivel bajo y vuelve mañana
     p.proximo = Date.now() + DIAS_NIVEL[primeraVez ? p.nivel : 1] * 864e5 - 36e5;
@@ -686,7 +751,6 @@ function comprobar() {
     p.nivel = Math.max(0, p.nivel - 2);
     p.proximo = 0;
     lec.falladas.add(p.id);
-    lec.vidas--;
     // Duolingo: la pregunta fallada vuelve al final de la lección
     lec.cola.push(lec.cola.shift());
   }
@@ -705,40 +769,43 @@ function comprobar() {
   const boton = document.getElementById('lec-boton');
   boton.textContent = 'Continuar';
   boton.className = 'btn' + (bien ? '' : ' rojo');
-  document.getElementById('lec-vidas').textContent = lec.vidas;
+  document.getElementById('lec-conoc').textContent = conocimiento(lec.pool).puntaje;
   document.getElementById('lec-barra').style.width = (lec.hechas / lec.total * 100) + '%';
 }
 
 function siguiente() {
-  if (lec.vidas <= 0 || !lec.cola.length) terminar(lec.vidas > 0);
+  if (!lec.cola.length) terminar();
   else mostrarPregunta();
 }
 
-function terminar(completa) {
+function terminar() {
   lec.estado = 'fin';
-  if (completa) lec.xp += 5;
+  lec.xp += 5;
   const s = datos.stats;
   const antes = rachaActual();
-  if (lec.xp > 0 || completa) {
-    if (s.ultimoDia !== hoy()) { s.racha = s.ultimoDia === hoy(-1) ? s.racha + 1 : 1; s.ultimoDia = hoy(); }
-    if (s.diaXp !== hoy()) { s.diaXp = hoy(); s.xpHoy = 0; }
-    s.xpHoy += lec.xp; s.xp += lec.xp;
-  }
+  if (s.ultimoDia !== hoy()) { s.racha = s.ultimoDia === hoy(-1) ? s.racha + 1 : 1; s.ultimoDia = hoy(); }
+  if (s.diaXp !== hoy()) { s.diaXp = hoy(); s.xpHoy = 0; }
+  s.xpHoy += lec.xp; s.xp += lec.xp;
   guardar();
 
   const prec = Math.round(lec.primeras / lec.total * 100);
+  const ahora = conocimiento(lec.pool).puntaje;
+  const [, gNombre, gIco] = grado(ahora);
+  const subioGrado = grado(ahora)[0] > grado(lec.antes)[0];
+  const delta = ahora - lec.antes;
   const cuerpo = document.getElementById('lec-cuerpo');
-  document.getElementById('lec-barra').style.width = completa ? '100%' : document.getElementById('lec-barra').style.width;
+  document.getElementById('lec-barra').style.width = '100%';
   cuerpo.innerHTML = '';
   cuerpo.append(el('div', { class: 'fin' },
-    el('div', { class: 'grande' }, completa ? (prec === 100 ? '🏆' : '🎉') : '💔'),
-    el('h2', {}, completa ? (prec === 100 ? '¡Lección perfecta!' : '¡Lección completada!') : 'Te quedaste sin vidas'),
-    el('p', { class: 'suave' }, completa ? 'Tu progreso quedó guardado.' : 'Tranquilo, lo que respondiste quedó guardado. Las que fallaste volverán pronto.'),
+    el('div', { class: 'grande' }, subioGrado ? gIco : (prec === 100 ? '🏆' : '🎉')),
+    el('h2', {}, subioGrado ? `¡Subiste a ${gNombre}!` : (prec === 100 ? '¡Lección perfecta!' : '¡Lección completada!')),
+    el('p', { class: 'suave' }, `${lec.materia || 'Todas las materias'}: ${gIco} ${gNombre}`),
     el('div', { class: 'cajas' },
       el('div', { class: 'caja xp' }, el('small', {}, 'XP'), '⭐ ' + lec.xp),
       el('div', { class: 'caja prec' }, el('small', {}, 'Precisión'), '🎯 ' + prec + '%'),
-      el('div', { class: 'caja racha' }, el('small', {}, 'Racha'), '🔥 ' + rachaActual())),
-    rachaActual() > antes ? el('p', { style: 'color:var(--naranja);font-weight:800' }, `¡Racha de ${rachaActual()} ${rachaActual() === 1 ? 'día' : 'días'}!`) : ''));
+      el('div', { class: 'caja conoc' }, el('small', {}, 'Conocimiento'), `🧠 ${ahora}` + (delta ? ` (${delta > 0 ? '+' : ''}${delta})` : ''))),
+    el('p', { class: 'suave', style: 'font-size:14px' }, 'El conocimiento sube cuando aciertas a la primera y vuelves a acertar en los repasos de los días siguientes. Las preguntas difíciles pesan más.'),
+    rachaActual() > antes ? el('p', { style: 'color:var(--naranja);font-weight:800' }, `🔥 ¡Racha de ${rachaActual()} ${rachaActual() === 1 ? 'día' : 'días'}!`) : ''));
   document.getElementById('lec-pie').className = 'pie';
   document.getElementById('lec-resultado').classList.add('oculto');
   const boton = document.getElementById('lec-boton');
